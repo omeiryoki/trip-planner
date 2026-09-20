@@ -1,5 +1,7 @@
 const CACHE_KEY = 'trip-planner:exchange-rates'
 const CACHE_TTL_MS = 60 * 60 * 1000 // 1 hour, per design.md Decision 4
+// Frankfurter (frankfurter.dev) is the default provider: free, no API key, ECB-sourced rates.
+const DEFAULT_RATES_URL = 'https://api.frankfurter.dev/v1/latest'
 
 let memoryCache = null
 
@@ -35,7 +37,8 @@ export async function getRates(config, baseCurrency) {
   }
 
   try {
-    const url = `${config.VITE_EXCHANGE_RATE_API_URL}?base=${encodeURIComponent(baseCurrency)}${
+    const baseUrl = config.VITE_EXCHANGE_RATE_API_URL || DEFAULT_RATES_URL
+    const url = `${baseUrl}?base=${encodeURIComponent(baseCurrency)}${
       config.VITE_EXCHANGE_RATE_API_KEY
         ? `&access_key=${encodeURIComponent(config.VITE_EXCHANGE_RATE_API_KEY)}`
         : ''
@@ -43,7 +46,10 @@ export async function getRates(config, baseCurrency) {
     const response = await fetch(url)
     if (!response.ok) throw new Error(`Exchange rate API returned ${response.status}`)
     const data = await response.json()
-    const entry = { base: baseCurrency, rates: data.rates, fetchedAt: Date.now() }
+    // The API omits the base currency from its own rates map - add it back so
+    // convert() can treat "convert into the display currency" like any other pair.
+    const rates = { ...data.rates, [baseCurrency]: 1 }
+    const entry = { base: baseCurrency, rates, fetchedAt: Date.now() }
     writeCache(entry)
     return { rates: entry.rates, fetchedAt: entry.fetchedAt, stale: false }
   } catch (error) {

@@ -1,42 +1,38 @@
 import { addDestination } from '../state/tripStore.js'
 
-// Maps a Google Places "type" to the granularity our spec requires
-// (place / city / province / country).
-function granularityFromPlace(place) {
-  const types = place.types ?? []
-  if (types.includes('country')) return 'country'
-  if (types.includes('administrative_area_level_1')) return 'province'
-  if (types.includes('locality') || types.includes('postal_town')) return 'city'
-  return 'place'
-}
-
-export function mountDestinationSearch(container, googleMaps) {
+// Lets a user specify destinations by typing a name and picking the
+// granularity themselves, per the trip-management spec's
+// "Destination specification" requirement.
+export function mountDestinationForm(container) {
   container.innerHTML = `
-    <div class="card">
-      <label for="destination-input">Add a destination</label>
-      <input id="destination-input" type="text"
-        placeholder="Search a place, city, province, or country" />
-    </div>
+    <form id="destination-form" class="card">
+      <label for="destination-name">Add a destination</label>
+      <input id="destination-name" type="text" placeholder="Name (e.g. Kyoto)" required />
+      <select id="destination-granularity">
+        <option value="place">Place</option>
+        <option value="city" selected>City</option>
+        <option value="province">Province/State</option>
+        <option value="country">Country</option>
+      </select>
+      <button type="submit" class="btn btn--primary">Add</button>
+    </form>
   `
 
-  const input = container.querySelector('#destination-input')
-  const autocomplete = new googleMaps.places.Autocomplete(input, {
-    fields: ['place_id', 'name', 'geometry', 'types'],
-  })
-
-  autocomplete.addListener('place_changed', () => {
-    const place = autocomplete.getPlace()
-    if (!place.geometry) return
+  container.querySelector('#destination-form').addEventListener('submit', (e) => {
+    e.preventDefault()
+    const nameInput = container.querySelector('#destination-name')
+    const granularitySelect = container.querySelector('#destination-granularity')
+    if (!nameInput.value.trim()) return
 
     addDestination({
       id: crypto.randomUUID(),
-      name: place.name,
-      granularity: granularityFromPlace(place),
-      lat: place.geometry.location.lat(),
-      lng: place.geometry.location.lng(),
-      placeId: place.place_id,
+      name: nameInput.value.trim(),
+      granularity: granularitySelect.value,
+      lat: null,
+      lng: null,
+      placeId: null,
     })
 
-    input.value = ''
+    nameInput.value = ''
   })
 }

@@ -9,9 +9,13 @@ Lets a signed-in user create a trip, specify where it goes, save it to their acc
 ### Requirement: Destination specification
 The system SHALL let a user specify one or more destinations for a trip at the level of place, city, province/state, or country.
 
-#### Scenario: Add a city destination
+#### Scenario: Add a city destination (Google Maps configured)
 - **WHEN** a user searches for and selects a city as a trip destination
 - **THEN** the system adds it to the trip's destination list
+
+#### Scenario: Add a destination without Google Maps configured
+- **WHEN** no Google Maps API key is configured and a user types a destination name and picks its granularity (place/city/province/country) manually
+- **THEN** the system adds it to the trip's destination list without coordinates or a Google place ID
 
 #### Scenario: Mixed destination granularity
 - **WHEN** a user adds one destination as a country and another as a specific place

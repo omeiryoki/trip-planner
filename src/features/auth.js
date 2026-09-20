@@ -14,8 +14,10 @@ export function initAuth(supabase) {
   })
 
   return {
-    signInWithGoogle: () =>
-      supabase.auth.signInWithOAuth({ provider: 'google' }),
+    signUpWithPassword: (email, password) =>
+      supabase.auth.signUp({ email, password }),
+    signInWithPassword: (email, password) =>
+      supabase.auth.signInWithPassword({ email, password }),
     signOut: () => supabase.auth.signOut(),
   }
 }

@@ -5,14 +5,14 @@
 See proposal.md - Why/What Changes for motivation and scope. Key constraints:
 - Frontend is Vite + HTML/CSS + vanilla JS only - no UI framework (no React/Vue/etc).
 - Greenfield project - no existing code, specs, or data to migrate.
-- Three external service families are involved: Supabase (auth + data), Google Maps Platform (places, directions), Google Calendar API (export), plus a currency exchange-rate API.
+- External services: Supabase (auth + data) and, optionally, a currency exchange-rate API. Google Maps Platform (places, directions) and Google Calendar API (export) were dropped from this iteration - see "Decisions 2 & 3 (superseded)" below.
 
 ## Goals / Non-Goals
 
 **Goals:**
 - Define the module structure for a framework-less Vite app that stays maintainable as features grow.
 - Define the data model in Supabase Postgres backing trips, itineraries, and sharing.
-- Define how the app talks to Google Maps Platform, Google Calendar, and the exchange-rate API, and where API keys live.
+- Define how the app talks to Supabase and the optional exchange-rate API, and where API keys live.
 - Define the approach for drag-and-drop calendar scheduling without a framework.
 
 **Non-Goals:**
@@ -24,21 +24,19 @@ See proposal.md - Why/What Changes for motivation and scope. Key constraints:
 ## Decisions
 
 ### 1. Supabase for auth + data, no custom backend
-Use Supabase Auth (Google OAuth provider) for sign-in and Supabase Postgres (via `@supabase/supabase-js` from the browser, protected by Row Level Security) for storing trips, itinerary items, and shares.
+Use Supabase Auth (email/password provider) for sign-in and Supabase Postgres (via `@supabase/supabase-js` from the browser, protected by Row Level Security) for storing trips, itinerary items, and shares.
 - **Alternative considered**: Firebase (Auth + Firestore) - comparable fit, but Postgres/RLS gives more natural relational modeling for trips → destinations → itinerary items → travel legs, and simpler cost-aggregation queries.
 - **Alternative considered**: custom Node/Express backend - rejected; adds a service to build, deploy, and secure for no benefit over Supabase's built-in auth + RLS for this app's needs.
+- **Superseded**: Google sign-in via Supabase's Google OAuth provider was the original plan. Dropped for this iteration per explicit request to remove the Google Cloud dependency while the core app is built out; `signInWithOAuth({ provider: 'google' })` is a one-line re-add to `src/features/auth.js` plus a UI button once a Google OAuth client is configured in Supabase.
 
-### 2. Google Maps Platform for places and directions
-Use the Places API for nearby attractions/restaurants/hotels and the Directions/Distance Matrix API for route suggestions and cost estimation between itinerary stops, called directly from the client with a key restricted (HTTP referrer + API restrictions) in Google Cloud Console.
-- Cost estimates for private vehicles are derived from distance (Distance Matrix) combined with a configurable fuel-cost-per-distance assumption, since Google does not return a monetary driving cost. Public-transit cost is taken from Directions API fare data where available, otherwise flagged as unavailable per Requirement "No route available" / cost scenarios in `travel-directions`.
-- **Alternative considered**: a routing-only open-source stack (e.g. OSRM + OpenStreetMap data) - rejected; would require self-hosting and lacks place recommendation data, and Google Maps/Calendar integration was already required for export.
+### 2. Google Maps Platform for places and directions (superseded - not built)
+Originally planned: Places API for nearby attractions/restaurants/hotels and Directions/Distance Matrix API for route suggestions and cost estimation between itinerary stops. Dropped from this iteration to avoid depending on Google Cloud Console setup before the core app works end-to-end. Destinations and places to visit are entered manually instead (`src/features/destinations.js`, `src/features/itineraryItems.js`); the `place-recommendations` and `travel-directions` capabilities were removed from this change's specs rather than left describing unbuilt behavior. The `travel_legs` table remains in the schema (unpopulated) so a future change can re-add this without a data model rework.
 
-### 3. Google Calendar export via a second, separate OAuth consent
-Google Calendar export requires the `https://www.googleapis.com/auth/calendar.events` scope, which Supabase's default Google sign-in does not request (Supabase Auth is for identity, not for granting arbitrary Google API scopes). Design: request Calendar access as a separate, explicit Google OAuth step (Google Identity Services token flow) only when the user first uses "Export to Google Calendar", store nothing beyond the short-lived access token in memory, and re-prompt when it expires.
-- **Alternative considered**: request the Calendar scope during the initial Supabase sign-in - rejected; it would force every user through an extra consent screen and a broader permission grant just to sign in, even if they never use export.
+### 3. Google Calendar export (superseded - not built)
+Originally planned as a separate OAuth consent (`calendar.events` scope) from the app's sign-in, since Calendar export needs a scope that identity sign-in does not grant. Dropped along with Google Maps Platform for the same reason. The `calendar-map-export` capability was removed from this change's specs; re-adding it later means the same separate-consent approach described here previously, not a new design.
 
 ### 4. Currency conversion via a rates cache, not per-request calls
-Fetch exchange rates from a public exchange-rate API on a timer (e.g. hourly) and cache the latest rates client-side (in memory + `localStorage` fallback with a timestamp), converting costs locally against the cached rates. This satisfies the `currency-conversion` spec's "current exchange rate" requirement while avoiding a network call per displayed cost.
+Fetch exchange rates from [Frankfurter](https://frankfurter.dev) (free, no API key, ECB-sourced; configurable to a different provider via `VITE_EXCHANGE_RATE_API_URL`/`VITE_EXCHANGE_RATE_API_KEY` if needed) on a timer (hourly) and cache the latest rates client-side (in memory + `localStorage` fallback with a timestamp), converting costs locally against the cached rates. This satisfies the `currency-conversion` spec's "current exchange rate" requirement while avoiding a network call per displayed cost. Frankfurter's response omits the base currency from its own rates map, so the client adds `{ [base]: 1 }` back in before caching.
 - **Alternative considered**: convert server-side via a Supabase Edge Function - deferred; adds infra for no correctness benefit since rates only need hourly freshness, not per-request accuracy.
 
 ### 5. Framework-less calendar drag-and-drop
@@ -62,12 +60,7 @@ Row Level Security: a row is readable/writable by its trip's owner and by users 
 
 ## Risks / Trade-offs
 
-- [Google Maps Platform usage costs scale with traffic] → cache place/direction lookups per session where reasonable, and put a Google Cloud budget alert in place before launch.
-- [Client-side API keys are visible to users] → restrict the Maps Platform key by HTTP referrer and by API in Google Cloud Console; keep the Supabase key as the public anon key protected by RLS, never a service-role key.
-- [Two separate Google consent flows (Supabase sign-in, Calendar export) could confuse users] → make the Calendar export consent screen clearly labeled as a separate, optional permission requested only at export time.
+- [Client-side API keys are visible to users] → the Supabase key is the public anon key, protected by RLS, never a service-role key.
 - [Exchange rates cached hourly can drift from real-time rates] → acceptable per proposal (estimates, not transactions); surface the rate's timestamp to the user per the `currency-conversion` "stale or unavailable" scenario.
 - [Native HTML5 Drag and Drop has inconsistent touch-device support] → validate on real tablets/phones during implementation; fall back to a small DnD utility library (see Decision 5) if needed.
-
-## Open Questions
-
-- Exact exchange-rate API provider/plan (e.g. exchangerate.host, Open Exchange Rates) - can be chosen during implementation without affecting the spec or approach, as long as it returns current rates.
+- [Manual destination/place entry has no de-duplication or validation Google Places would have provided] → acceptable for this iteration; a future re-add of Google Places (see Decisions 1-3, superseded) would restore that.
