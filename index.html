@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Trip Planner</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="app-header">
+        <h1 class="app-header__title">Trip Planner</h1>
+        <nav class="app-header__nav">
+          <button id="nav-my-trips" class="btn btn--ghost" hidden>My trips</button>
+          <div id="auth-slot"></div>
+        </nav>
+      </header>
+
+      <main id="main" class="app-main">
+        <!-- Views are rendered here by src/main.js -->
+      </main>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
