@@ -87,28 +87,48 @@ returns boolean language sql stable as $$
 $$;
 
 -- trips
+drop policy if exists "trips_select" on trips;
+drop policy if exists "trips_insert" on trips;
+drop policy if exists "trips_update" on trips;
+drop policy if exists "trips_delete" on trips;
 create policy "trips_select" on trips for select using (has_trip_access(id));
 create policy "trips_insert" on trips for insert with check (owner_id = auth.uid());
 create policy "trips_update" on trips for update using (is_trip_editor(id));
 create policy "trips_delete" on trips for delete using (is_trip_owner(id));
 
 -- trip_collaborators (only the owner manages sharing; collaborators can see who else has access)
+drop policy if exists "collaborators_select" on trip_collaborators;
+drop policy if exists "collaborators_insert" on trip_collaborators;
+drop policy if exists "collaborators_update" on trip_collaborators;
+drop policy if exists "collaborators_delete" on trip_collaborators;
 create policy "collaborators_select" on trip_collaborators for select using (has_trip_access(trip_id));
 create policy "collaborators_insert" on trip_collaborators for insert with check (is_trip_owner(trip_id));
 create policy "collaborators_update" on trip_collaborators for update using (is_trip_owner(trip_id));
 create policy "collaborators_delete" on trip_collaborators for delete using (is_trip_owner(trip_id));
 
 -- destinations / itinerary_items / travel_legs share the same access shape
+drop policy if exists "destinations_select" on destinations;
+drop policy if exists "destinations_write" on destinations;
+drop policy if exists "destinations_update" on destinations;
+drop policy if exists "destinations_delete" on destinations;
 create policy "destinations_select" on destinations for select using (has_trip_access(trip_id));
 create policy "destinations_write" on destinations for insert with check (is_trip_editor(trip_id));
 create policy "destinations_update" on destinations for update using (is_trip_editor(trip_id));
 create policy "destinations_delete" on destinations for delete using (is_trip_editor(trip_id));
 
+drop policy if exists "items_select" on itinerary_items;
+drop policy if exists "items_write" on itinerary_items;
+drop policy if exists "items_update" on itinerary_items;
+drop policy if exists "items_delete" on itinerary_items;
 create policy "items_select" on itinerary_items for select using (has_trip_access(trip_id));
 create policy "items_write" on itinerary_items for insert with check (is_trip_editor(trip_id));
 create policy "items_update" on itinerary_items for update using (is_trip_editor(trip_id));
 create policy "items_delete" on itinerary_items for delete using (is_trip_editor(trip_id));
 
+drop policy if exists "legs_select" on travel_legs;
+drop policy if exists "legs_write" on travel_legs;
+drop policy if exists "legs_update" on travel_legs;
+drop policy if exists "legs_delete" on travel_legs;
 create policy "legs_select" on travel_legs for select using (has_trip_access(trip_id));
 create policy "legs_write" on travel_legs for insert with check (is_trip_editor(trip_id));
 create policy "legs_update" on travel_legs for update using (is_trip_editor(trip_id));
